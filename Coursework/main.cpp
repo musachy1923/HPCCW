@@ -6,13 +6,23 @@
 #define f2(x) (u[x]*u[x]*u[x]-v[x])*dt+v[x]
 #define neuman(x, a, b, c, d) (1/h/h*(x[a]+x[b]+x[c]-3*x[d]))*dt
 #define neuman2(x, a, b, c) (1/h/h*(x[a]+x[b]-2*x[c]))
-
+#define F77NAME(x) x##_
 using namespace std;
 
 
-
+extern "C" {void F77NAME(dgemv) (const char& trans,
+                             const int& M, const int& N,
+                             const double& alpha, double * A, const int& lda, 
+                             const double * x, const int& incx,
+                             const double& beta, double * Y, const int& incy);
+}
+                 
+                             
 void printMatrix(double* A, const int& M, const int& N);
 void writeFile(string fileName, int Ny, int Nx, int tn, double* x);
+void singleUpperBandedOptimised(int n, double* H, double alpha, double beta);
+void singleUpperBanded(int nsv, double* H, double alpha, double beta);
+void arrayPrint(double * a, int n);
 
 int main(int argc, char **argv)
 {
@@ -27,8 +37,8 @@ int main(int argc, char **argv)
 	double dx = 1;
     double dy = 1;
     double h = dx;
-    int Nx = 101;
-    int Ny = 50;
+    int Nx = 10;
+    int Ny = 10;
     double Lx = dx*Nx;
     double Ly = dy*Ny;
     
@@ -49,7 +59,7 @@ int main(int argc, char **argv)
     
     //boundary conditions from the handout
     double dt = 0.001;
-    double t = 0.003;
+    double t = 0.002;
     int tn = t/dt; //number of time nodes
     
     double * u = new double[Nx*Ny*(tn)];
@@ -119,6 +129,45 @@ v[t2+Nx-1] = (1/h/h*(v[ts+Nx-1]+v[ts+Nx-1]-2*v[ts+Nx-1]))*dt+f2(ts+Nx-1);
 v[t2+Nx*(Ny-1)] = (1/h/h*(v[ts+Nx*(Ny-1)]+v[ts+Nx*(Ny-1)]-2*v[ts+Nx*(Ny-1)]))*dt+f2(ts+Nx*(Ny-1));
 v[t2+Nx*Ny] = (1/h/h*(v[ts+Nx*Ny]+v[ts+Nx*Ny]-2*v[ts+Nx*Ny]))*dt+f2(ts+Nx*Ny);
 
+//for this timestep the conditions at boundaries are set, just need to evaluate the inner grid
+
+
+double * A = new double[(Nx-2)*(Ny-2)];
+double * y = new double[Nx-2];
+double * u_j = new double[(Nx-2)];
+double * u_jp1 = new double[(Nx-2)];
+double * u_jm1 = new double[(Nx-2)];
+double * fu1 = new double[(Nx-2)];
+double * v_j = new double[(Nx-2)];
+double * v_jp1 = new double[(Nx-2)];
+double * v_jm1 = new double[(Nx-2)];
+double * fv2 = new double[(Nx-2)];
+singleUpperBanded(Ny-2, A, -4, 1);
+
+for (int j = 1; j < Ny-1; j++) {
+    for (int i = 1; i < Nx-1; i++) {
+        u_j[i-1] = u[i+Nx*j];
+        u_jp1[i-1] = u[i+Nx*(j+1)]+u[i+Nx*(j-1)]+f1(i+Nx*j);
+        v_j[i-1] = v[i+Nx*j];
+        v_jp1[i-1] = v[i+Nx*(j+1)]+v[i+Nx*(j-1)]+f2(i+Nx*j);
+    }
+    F77NAME(dgemv) ('N', Ny-2, Nx-2, 1, A, Nx-2, u_j, 1, 0, y, 1);
+    
+    for (int i = 1; i < Nx-1; i++) {
+        u[t2+Nx*(j)+i] = y[i-1]+u_jp1[i-1];
+        fu1[i-1] = y[i-1]+u_jp1[i-1];
+    }
+    
+}
+
+
+
+
+
+arrayPrint(fu1, Nx-2);
+
+
+//printMatrix(A, Ny-2, Nx-2);
 } 
 
 
@@ -173,4 +222,31 @@ void writeFile(string fileName, int Ny, int Nx, int tn,  double * x) {
     
     
     //MPI cartesian topology
+}
+
+void singleUpperBandedOptimised(int n, double* H, double alpha, double beta) {
+    const int ldh = 2;      //3 Diagonal and upper diagonal
+    H[1] = alpha;
+    for (int i = 1; i < n; ++i) {
+        H[i*ldh] = beta;
+        H[i*ldh + 1] = alpha;
+        //H[i*ldh+2]= gamma;
+    }
+}
+
+void singleUpperBanded(int nsv, double* H, double alpha, double beta) {
+    H[0] = alpha;
+    for (int i = 1; i < nsv; ++i) {
+        H[i*nsv + i - 1] = beta;
+        H[i*nsv + i] = alpha;
+    }
+    //printMatrix(H, nsv, nsv);
+}
+
+void arrayPrint(double * a, int n) {
+    for (int i = 0; i < n; i++) {
+    
+        cout << a[i] << endl;    
+    
+    }
 }
