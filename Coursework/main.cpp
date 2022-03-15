@@ -3,6 +3,8 @@
 #include <fstream>
 using namespace std;
 
+#define u_n_1(x) for (1/h/h*(u[x]+u[x]+u[x]-3*u[x])+epsilon*u[x]*(1-u[x])*(u[x]-(v[x]+b)/a))*dt+u[x];
+#define v_n_1(x) for (1/h/h*(v[x]+v[x]+v[x]-3*v[x])+u[x]*u[x]*u[x]-v[x)*dt+v[x];
 void printMatrix(double* A, const int& M, const int& N);
 void writeFile(string fileName, int Ny, int Nx, double* x);
 
@@ -76,36 +78,43 @@ int main(int argc, char **argv)
     
     //do for i = 1, come back later for i = 0
     //eg issue with 
-    
-    for (int i = 1; i < Ny+abs(Nx-Ny); i++) {
+for (int k = 0; k < tn; k++) {
+   ts = Nx*Ny*k;
+   t2 = Nx*Ny*(k+1)
+        for (int i = 1; i < Ny+abs(Nx-Ny); i++) {
         if (i < Ny){
             //Left
-            u[i*Nx] = 1/h/h*(u[1+Nx*i]+u[Nx*(i+1)]+u[Nx*(i-1)]-3*u[Nx*i]);
-            //v[i*Nx] = 1/h/h*(v[1+Nx*i]+v[Nx*(i+1)]+v[Nx*(i-1)]-3*v[Nx*i]);
+            u[t2+i*Nx] = (1/h/h*(u[ts+1+Nx*i]+u[ts+Nx*(i+1)]+u[ts+Nx*(i-1)]-3*u[ts+Nx*i])+epsilon*u[ts+Nx*i]*(1-u[ts+Nx*i])*(u[ts+Nx*i]-(v[ts+i*Nx]+b)/a))*dt+u[ts+Nx*i];
+            v[t2+i*Nx] = (1/h/h*(v[ts+1+Nx*i]+v[ts+Nx*(i+1)]+v[ts+Nx*(i-1)]-3*v[ts+Nx*i])+u[ts+Nx*i]*u[ts+Nx*i]*u[ts+Nx*i]-v[ts+i*Nx])*dt+v[ts+Nx*i];
             //Right
-            u[Nx-1+i*Nx] = 1/h/h*(u[Nx-2+Nx*i]+u[Nx-1+Nx*(i+1)]+u[Nx-1+Nx*(i-1)]-3*u[Nx-1+Nx*i]);
-            //v[Nx-1+i*Nx] = 1/h/h*(v[Nx-2+Nx*i]+v[Nx-1+Nx*(i+1)]+v[Nx-1+Nx*(i-1)]-3*v[Nx-1+Nx*i]);
+            u[t2+Nx-1+i*Nx] = (1/h/h*(u[ts+Nx-2+Nx*i]+u[ts+Nx-1+Nx*(i+1)]+u[ts+Nx-1+Nx*(i-1)]-3*u[ts+Nx-1+Nx*i])+epsilon*u[ts+Nx-1+Nx*i]*(1-u[ts+Nx-1+Nx*i])*(u[ts+Nx-1+Nx*i]-(v[ts+Nx-1+Nx*i]+b)/a))*dt+u[ts+Nx-1+Nx*i];
+            v[t2+Nx-1+i*Nx] = (1/h/h*(v[ts+Nx-2+Nx*i]+v[ts+Nx-1+Nx*(i+1)]+v[ts+Nx-1+Nx*(i-1)]-3*v[ts+Nx-1+Nx*i])-3*v[ts+Nx-1+Nx*i])+u[ts+Nx-1+Nx*i]*u[ts+Nx-1+Nx*i]*u[ts+Nx-1+Nx*i]-v[ts+Nx-1+Nx*i])*dt+v[ts+Nx-1+Nx*i];
         }
         if (i < Nx) {
             //Lower
-            u[i] = 1/h/h*(u[1+i]+u[(i+1)]+u[(i-1)]-3*u[i]);
-            //v[i] = 1/h/h*(v[1+i]+v[(i+1)]+v[(i-1)]-3*v[i]);
+            u[t2+i] = (1/h/h*(u[ts+1+i]+u[ts+(i+1)]+u[ts+(i-1)]-3*u[ts+i])+epsilon*u[ts+i]*(1-u[ts+i])*(u[ts+i]-(v[ts+i]+b)/a))*dt+u[ts+i];
+            v[t2+i] = (1/h/h*(v[ts+1+i]+v[ts+(i+1)]+v[(ts+i-1)]-3*v[ts+i])+u[ts+i]*u[ts+i]*u[ts+i]-v[ts+i])*dt+v[ts+i];
             //Upper
-            u[Nx*(Ny-1)+i] = 1/h/h*(u[Nx*(Ny-2)+i]+u[Nx*(Ny-1)+i+1]+u[Nx*(Ny-1)+i-1]-3*u[Nx*(Ny-1)+i]);
-            //v[Nx*(Ny-1)+i] = 1/h/h*(v[Nx*(Ny-2)+i]+v[Nx*(Ny-1)+i+1]+v[Nx*(Ny-1)+i-1]-3*v[Nx*(Ny-1)+i]);
-            
+            u[t2+Nx*(Ny-1)+i] = (1/h/h*(u[ts+Nx*(Ny-2)+i]+u[ts+Nx*(Ny-1)+i+1]+u[ts+Nx*(Ny-1)+i-1]-3*u[ts+Nx*(Ny-1)+i])+epsilon*u[ts+Nx*(Ny-1)+i]*(1-u[ts+Nx*(Ny-1)+i])*(u[ts+Nx*(Ny-1)+i]-(v[ts+Nx*(Ny-1)+i]+b)/a))*dt+u[ts+Nx*(Ny-1)+i];
+            v[t2+Nx*(Ny-1)+i] = (1/h/h*(v[ts+Nx*(Ny-2)+i]+v[ts+Nx*(Ny-1)+i+1]+v[ts+Nx*(Ny-1)+i-1]-3*v[ts+Nx*(Ny-1)+i])+u[ts+Nx*(Ny-1)+i]*u[ts+Nx*(Ny-1)+i]*u[ts+Nx*(Ny-1)+i]-v[ts+Nx*(Ny-1)+i])*dt+v[ts+Nx*(Ny-1)+i];;
         }
-        
-        
 }
+u[t2] = (1/h/h*(u[ts+1]+u[ts+Nx]-2*u[ts])+epsilon*u[ts]*(1-u[ts])*(u[ts]-(v[ts]+b)/a))*dt+u[ts];
+u[t2+Nx-1] = (1/h/h*(u[ts+Nx-1]+u[ts+Nx-1]-2*u[ts+Nx-1])+epsilon*u[ts+Nx-1]*(1-u[ts+Nx-1])*(u[ts+Nx-1]-(v[ts+Nx-1]+b)/a))*dt+u[ts+Nx-1];
+u[t2+Nx*(Ny-1)] = (1/h/h*(u[ts+Nx*(Ny-1)]+u[ts+Nx*(Ny-1)]-2*u[ts+Nx*(Ny-1)])+epsilon*u[ts+Nx*(Ny-1)]*(1-u[ts+Nx*(Ny-1)])*(u[ts+Nx*(Ny-1)]-(v[ts+Nx*(Ny-1)]+b)/a))*dt+u[ts+Nx*(Ny-1)];
+u[t2+Nx*Ny] = (1/h/h*(u[ts+Nx*Ny]+u[ts+Nx*Ny]-2*u[ts+Nx*Ny])+epsilon*u[ts+Nx*Ny]*(1-u[ts+Nx*Ny])*(u[ts+Nx*Ny]-(v[ts+Nx*Ny]+b)/a))*dt+u[ts+Nx*Ny];
 
-        
-        
-        
-        
+v[t2] = (1/h/h*(v[ts]+v[ts]-2*v[ts])+u[ts]*u[ts]*u[ts]-v[ts])*dt+v[ts];
+v[t2+Nx-1] = (1/h/h*(v[ts+Nx-1]+v[ts+Nx-1]-2*v[ts+Nx-1])+u[ts+Nx-1]*u[ts+Nx-1*u[ts+Nx-1]-v[ts+Nx-1])*dt+v[ts+Nx-1];
 
-    
-    
+} 
+
+
+
+
+
+
+
     
     
     //printMatrix(u, Ny, Nx);
