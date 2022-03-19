@@ -2,15 +2,14 @@
 #include <iomanip>
 #include <fstream>
 //useful macros
-#define laplacianu(a, b, c, d) 1/h/h*(u[a]+u[b]+u[c]-3*u[d])
-#define laplacianv(a, b, c, d) 1/h/h*(v[a]+v[b]+u[c]-3*v[d])
-#define f1(x) (epsilon*u[x]*(1-u[x])*(u[x]-(v[x]+b)/a))*dt+u[x]
-#define f2(x) (u[x]*u[x]*u[x]-v[x])*dt+v[x]
+#define laplacianu(a, b, c, d) (1/h/h*(u[a]+u[b]+u[c]-3*u[d]))
+#define laplacianv(a, b, c, d) (1/h/h*(v[a]+v[b]+v[c]-3*v[d]))
+#define laplacianuc(a, b, c) (1/h/h*(u[a]+u[b]-2*u[c]))
+#define laplacianvc(a, b, c) (1/h/h*(v[a]+v[b]-2*v[c]))
+#define f1(x) (epsilon*u[x]*(1-u[x])*(u[x]-(v[x]+b)/a))
+#define f2(x) (u[x]*u[x]*u[x]-v[x])
 
-#define f1_(x) (epsilon*u[x]*(1-u[x])*(u[x]-(v[x]+b)/a))*dt
-#define f2_(x) (u[x]*u[x]*u[x]-v[x])*dt
-#define neuman(x, a, b, c, d) (mu1/h/h*(x[a]+x[b]+x[c]-3*x[d]))*dt
-#define neuman2(x, a, b, c) (mu2/h/h*(x[a]+x[b]-2*x[c]))
+
 #define F77NAME(x) x##_
 using namespace std;
 extern "C" {void F77NAME(dgemv) (const char& trans,
@@ -31,10 +30,10 @@ void Banded(int n, int m, int NS, double* H, double alpha, double beta);
 int main(int argc, char **argv)
 {
     //
-    double a = 5;
+    double a = 0.75;
     double b = 0.06;
     double epsilon = 50;
-    double mu1 = 50;
+    double mu1 = 5;
     double mu2 = 0.0;
     //
     
@@ -45,6 +44,22 @@ int main(int argc, char **argv)
     int Ny = 10;
     double Lx = dx*Nx;
     double Ly = dy*Ny;
+    
+    double dt = 0.001;
+    double t =  0.002;
+    int tn = t/dt; //number of time nodes
+    
+    //
+    double * Au = new double[(Nx-2)*(Ny-2)*(Nx-2)*(Ny-2)];
+    double * Av = new double[(Nx-2)*(Ny-2)*(Nx-2)*(Ny-2)];
+    Banded(Nx-2, Ny-2, (Nx-2)*(Ny-2), Au, mu1/h/h*(-4*dt)+1, mu1/h/h*dt);
+    Banded(Nx-2, Ny-2, (Nx-2)*(Ny-2), Av, mu2/h/h*(-4*dt)+1, mu2/h/h*dt);
+    printMatrix(Au, (Nx-2)*(Ny-2), (Nx-2)*(Ny-2));
+    //
+    double * yu = new double[(Nx-2)*(Ny-2)];
+    double * yv = new double[(Nx-2)*(Ny-2)];
+    double * u_ = new double[(Nx-2)*(Ny-2)];
+    double * v_ = new double[(Nx-2)*(Ny-2)];
     
     
     //meshgrid
@@ -62,9 +77,7 @@ int main(int argc, char **argv)
     //printMatrix(y, Ny, Nx);
     
     //boundary conditions from the handout
-    double dt = 0.001;
-    double t = 0.002;
-    int tn = t/dt; //number of time nodes
+
     
     double * u = new double[Nx*Ny*(tn)];
     double * v = new double[Nx*Ny*(tn)];
@@ -87,6 +100,7 @@ int main(int argc, char **argv)
             
         }
     }
+    //arrayPrint(u, Nx*Ny);
     //Neuman boundary conditions
     //x = 0
     //Merge with upper code when done
@@ -97,74 +111,99 @@ for (int k = 1; k < tn; k++) {
 
    int ts = Nx*Ny*(k-1);
    int t2 = Nx*Ny*(k);
+   
 
         for (int i = 1; i < Ny+abs(Nx-Ny); i++) {
         if (i < Ny){
             //Left
-            
-            
-            
-            u[t2+(i)*Nx] = (mu1/h/h*(u[ts+1+Nx*i]+u[ts+Nx*(i+1)]+u[ts+Nx*(i-1)]-3*u[ts+Nx*i]))*dt+f1(ts+Nx*i);
-            v[t2+i*Nx] = (mu2/h/h*(v[ts+1+Nx*i]+v[ts+Nx*(i+1)]+v[ts+Nx*(i-1)]-3*v[ts+Nx*i]))*dt+f2(ts+Nx*i);
+            u[t2+i*Nx] = (mu1*laplacianu(ts+Nx*i+1, ts+Nx*(i+1), ts+Nx*(i-1), ts+Nx*i)+f1(ts+Nx*i))*dt+u[ts+Nx*i];
+            v[t2+i*Nx] = (mu2*laplacianv(ts+Nx*i+1, ts+Nx*(i+1), ts+Nx*(i-1), ts+Nx*i)+f2(ts+Nx*i))*dt+v[ts+Nx*i];
             //Right
-            u[t2+Nx-1+i*Nx] = (mu1/h/h*(u[ts+Nx-2+Nx*i]+u[ts+Nx-1+Nx*(i+1)]+u[ts+Nx-1+Nx*(i-1)]-3*u[ts+Nx-1+Nx*i]))*dt+f1(ts+Nx-1+Nx*i);
-            v[t2+Nx-1+i*Nx] = (mu2/h/h*(v[ts+Nx-2+Nx*i]+v[ts+Nx-1+Nx*(i+1)]+v[ts+Nx-1+Nx*(i-1)]-3*v[ts+Nx-1+Nx*i]))*dt+f2(ts+Nx-1+Nx*i);
+            u[t2+i*Nx+Nx-1] = (mu1*laplacianu(ts+i*Nx+Nx-2, ts+(i+1)*Nx+Nx-1, ts+(i-1)*Nx+Nx-1, ts+i*Nx+Nx-1)+f1(ts+i*Nx+Nx-1))*dt+u[ts+i*Nx+Nx-1];
+            v[t2+i*Nx+Nx-1] = (mu2*laplacianv(ts+i*Nx+Nx-2, ts+(i+1)*Nx+Nx-1, ts+(i-1)*Nx+Nx-1, ts+i*Nx+Nx-1)+f2(ts+i*Nx+Nx-1))*dt+v[ts+i*Nx+Nx-1];
           }
         if (i < Nx) {
             //Lower
-            u[t2+i] = (mu1/h/h*(u[ts+1+i]+u[ts+(i+1)]+u[ts+(i-1)]-3*u[ts+i]))*dt+f1(ts+i);
-            v[t2+i] = (mu2/h/h*(v[ts+1+i]+v[ts+(i+1)]+v[(ts+i-1)]-3*v[ts+i]))*dt+f2(ts+i);
+            u[t2+i] = (mu1*laplacianu(ts+i+1, ts+i-1, ts+Nx+i, ts+i)+f1(ts+i))*dt+u[ts+i];
+            v[t2+i] = (mu2*laplacianv(ts+i+1, ts+i-1, ts+Nx+i, ts+i)+f2(ts+i))*dt+v[ts+i];
             //Upper
-            u[t2+Nx*(Ny-1)+i] = (mu1/h/h*(u[ts+Nx*(Ny-2)+i]+u[ts+Nx*(Ny-1)+i+1]+u[ts+Nx*(Ny-1)+i-1]-3*u[ts+Nx*(Ny-1)+i]))*dt+f1(ts+Nx*(Ny-1)+i);
-            v[t2+Nx*(Ny-1)+i] = (mu2/h/h*(v[ts+Nx*(Ny-2)+i]+v[ts+Nx*(Ny-1)+i+1]+v[ts+Nx*(Ny-1)+i-1]-3*v[ts+Nx*(Ny-1)+i]))*dt+f2(ts+Nx*(Ny-1)+i);
+            
+            u[t2+Nx*(Ny-1)+i] = (mu1*laplacianu(ts+Nx*(Ny-1)+i+1, ts+Nx*(Ny-1)+i-1, ts+Nx*(Ny-2)+i, ts+Nx*(Ny-1)+i)+f1(ts+Nx*(Ny-1)+i))*dt+u[ts+Nx*(Ny-1)+i];
+            v[t2+Nx*(Ny-1)+i] = (mu2*laplacianv(ts+Nx*(Ny-1)+i+1, ts+Nx*(Ny-1)+i-1, ts+Nx*(Ny-2)+i, ts+Nx*(Ny-1)+i)+f2(ts+Nx*(Ny-1)+i))*dt+v[ts+Nx*(Ny-1)+i];
          }
 }
 
 
 //corners
+u[t2] = (mu1*laplacianuc(ts+1, ts+Nx, ts)+f1(ts))*dt+u[ts];
+u[t2+Nx*(Ny-1)] = (mu1*laplacianuc(ts+Nx*(Ny-1), ts+Nx*(Ny-2), ts+Nx*(Ny-1))+f1(ts+Nx*(Ny-1)))*dt+u[ts+Nx*(Ny-1)];
+u[t2+Nx-1] = (mu1*laplacianuc(ts+Nx-2, ts+Nx-1+Nx, ts+Nx-1)+f1(ts+Nx-1))*dt+u[ts+Nx-1];
+u[t2+Nx*(Ny-1)+Nx-1] = (mu1*laplacianuc(ts+Nx*(Ny-1)+Nx-2, ts+Nx*(Ny-2)+Nx-1, ts+Nx*(Ny-1)+Nx-1)+f1(ts+Nx*(Ny-1)+Nx-1))*dt+u[ts+Nx*(Ny-1)+Nx-1]; 
 
-u[t2] = (mu1/h/h*(u[ts+1]+u[ts+Nx]-2*u[ts]))*dt+f1(ts);
-u[t2+Nx-1] = (mu1/h/h*(u[ts+Nx-1]+u[ts+Nx-1]-2*u[ts+Nx-1]))*dt+f1(ts+Nx-1);
-
-u[t2+Nx*(Ny-1)] = (mu1/h/h*(u[ts+Nx*(Ny-1)]+u[ts+Nx*(Ny-1)]-2*u[ts+Nx*(Ny-1)]))*dt+f1(ts+Nx*(Ny-1));
-u[t2+Nx*Ny] = (mu1/h/h*(u[ts+Nx*Ny]+u[ts+Nx*Ny]-2*u[ts+Nx*Ny]))*dt+f1(ts+Nx*Ny);
-
-v[t2] = (mu2/h/h*(v[ts]+v[ts]-2*v[ts]))*dt+f2(ts);
-v[t2+Nx-1] = (mu2/h/h*(v[ts+Nx-1]+v[ts+Nx-1]-2*v[ts+Nx-1]))*dt+f2(ts+Nx-1);
-v[t2+Nx*(Ny-1)] = (mu2/h/h*(v[ts+Nx*(Ny-1)]+v[ts+Nx*(Ny-1)]-2*v[ts+Nx*(Ny-1)]))*dt+f2(ts+Nx*(Ny-1));
-v[t2+Nx*Ny] = (mu2/h/h*(v[ts+Nx*Ny]+v[ts+Nx*Ny]-2*v[ts+Nx*Ny]))*dt+f2(ts+Nx*Ny);
+v[t2] = (mu2*laplacianvc(ts+1, ts+Nx, ts)+f2(ts))*dt+v[ts];
+v[t2+Nx*(Ny-1)] = (mu2*laplacianvc(ts+Nx*(Ny-1), ts+Nx*(Ny-2), ts+Nx*(Ny-1))+f2(ts+Nx*(Ny-1)))*dt+v[ts+Nx*(Ny-1)];
+v[t2+Nx-1] = (mu2*laplacianvc(ts+Nx-2, ts+Nx-1+Nx, ts+Nx-1)+f2(ts+Nx-1))*dt+v[ts+Nx-1];
+v[t2+Nx*(Ny-1)+Nx-1] = (mu2*laplacianvc(ts+Nx*(Ny-1)+Nx-2, ts+Nx*(Ny-2)+Nx-1, ts+Nx*(Ny-1)+Nx-1)+f2(ts+Nx*(Ny-1)+Nx-1))*dt+v[ts+Nx*(Ny-1)+Nx-1]; 
 
 //for this timestep the conditions at boundaries are set, just need to evaluate the inner grid
 
 
-double * A = new double[(Nx-2)*(Ny-2)*(Nx-2)*(Ny-2)];
-double * yu = new double[(Nx-2)*(Ny-2)];
-double * yv = new double[(Nx-2)*(Ny-2)];
-double * u_ = new double[(Nx-2)*(Ny-2)];
-double * v_ = new double[(Nx-2)*(Ny-2)];
 
 
 
-Banded(Nx-2, Ny-2, (Nx-2)*(Ny-2), A, mu1/h/h*dt+1, mu1/h/h*dt);
-//printMatrix(A, (Nx-2)*(Ny-2), (Nx-2)*(Ny-2));
 
 
-for (int i = 1; i < (Nx-2)*(Ny-2)-1; i++) {
-    u_[i-1] = u[ts + i];
-    v_[i-1] = v[ts + i];
+for (int j = 1; j < Nx-1; j++) {
+    for (int i = 1; i < (Nx-1); i++) {
+      u_[(j-1)*(Nx-2)+i-1] = u[ts + Nx*j + i];
+      v_[(j-1)*(Nx-2)+i-1] = v[ts + Nx*j + i];   
+    }
 }
+//printMatrix(u, Ny, Nx);
+//printMatrix(x, Ny, Nx);
+//printMatrix(y, Ny, Nx);
+//printMatrix(u_, (Ny-2), (Nx-2));
 //arrayPrint(u_, (Nx-2)*(Ny-2));
 
 
-F77NAME(dgemv) ('N', Ny-2, Nx-2, 1, A, Nx-2, u_, 1, 0, yu, 1);
-F77NAME(dgemv) ('N', Ny-2, Nx-2, 1, A, Nx-2, v_, 1, 0, yv, 1);
 
+F77NAME(dgemv) ('N', (Nx-2)*(Ny-2), (Nx-2)*(Ny-2), 1, Au, (Nx-2)*(Ny-2), u_, 1, 0, yu, 1);
+F77NAME(dgemv) ('N', (Nx-2)*(Ny-2), (Nx-2)*(Ny-2), 1, Av, (Nx-2)*(Ny-2), v_, 1, 0, yv, 1);
 
-for (int i = 1; i < (Nx-2)*(Ny-2)-1; i++) {
-    u[t2+i] = yu[i-1]+f1_(ts+i);
-    v[t2+i]=  yv[i-1];f2_(ts+i);
+for (int j = 1; j < (Ny-1); j++) {
+    for (int i = 1; i < (Nx-1); i++) {
+        if (i ==1) {
+            u[t2+Nx*j+i] = yu[(j-1)*(Nx-2)+i-1]+f1(ts+Nx*j+i)*dt+mu1*dt/h/h*u[ts+Nx*j+i-1];
+            v[t2+Nx*j+i]=  yv[(j-1)*(Nx-2)+i-1]+f2(ts+Nx*j+i)*dt+mu2*dt/h/h*v[ts+Nx*j+i-1];
+        }
+        else if (i==Nx-2) {
+            u[t2+Nx*j+i] = yu[(j-1)*(Nx-2)+i-1]+f1(ts+Nx*j+i)*dt+mu1*dt/h/h*u[ts+Nx*j+i+1];
+            v[t2+Nx*j+i]=  yv[(j-1)*(Nx-2)+i-1]+f2(ts+Nx*j+i)*dt+mu2*dt/h/h*v[ts+Nx*j+i+1];
+            
+        }
+        else {
+            u[t2+Nx*j+i] = yu[(j-1)*(Nx-2)+i-1]+f1(ts+Nx*j+i)*dt;
+            v[t2+Nx*j+i]=  yv[(j-1)*(Nx-2)+i-1]+f2(ts+Nx*j+i)*dt;
+        }
+        
+        
+        
+    // << yu(ts+Nx*j+i)*dt << endl;
+    //cout << f2(ts+Nx*j+i)*dt << endl;
+}
+    
+    
 }
 
+
+//arrayPrint(yu, (Nx-2)*(Ny-2));
+//printMatrix(yu, Ny-2, Nx-2);
+//printMatrix(Au, (Nx-2)*(Ny-2), (Nx-2)*(Ny-2));
+
+//printMatrix(A, (Ny-2)*(Nx-2), (Ny-2)*(Nx-2));
+
+//arrayPrint(yu, (Nx-2)*(Ny-2));
+//
 
 
 /*
@@ -194,7 +233,7 @@ for (int j = 1; j < Ny-1; j++) {
     u[t2+Nx*(j)+1] = yu[0]*dt+u_jp1[0]+mu1/h/h*u[ts+Nx*(j)];
     v[t2+Nx*(j)+Nx-2] = yv[Nx-2-1]*dt+v_jp1[Nx-2-1]+mu2/h/h*v[ts+Nx*(j)];
 }
-
+*/
 if (k == tn-1) {
     double * u2 = new double[Nx*Ny];
     double * v2 = new double[Nx*Ny];
@@ -212,7 +251,7 @@ if (k == tn-1) {
      
  
 }
- * */
+ 
 
 } 
 
