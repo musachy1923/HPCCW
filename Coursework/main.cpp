@@ -17,6 +17,18 @@ extern "C" {void F77NAME(dgemv) (const char& trans,
                              const double& alpha, double * A, const int& lda, 
                              const double * x, const int& incx,
                              const double& beta, double * Y, const int& incy);
+                             
+            void F77NAME(dsymv) (const char& uplo,
+                             const int& N,
+                             const double& alpha, double * A, const int& lda, 
+                             const double * x, const int& incx,
+                             const double& beta, double * Y, const int& incy);
+            void F77NAME(dspmv) (const char& uplo,
+                             const int& N,
+                             const double& alpha, double * A, 
+                             const double * x, const int& incx,
+                             const double& beta, double * Y, const int& incy);
+                             
 }
 void printMatrix(double* A, const int& M, const int& N);
 void writeFile(string fileName, int Ny, int Nx, int tn, double* x);
@@ -25,6 +37,7 @@ void singleUpperBanded(int nsv, double* H, double alpha, double beta);
 void singleBanded(int nsv, double* H, double alpha, double beta);
 void arrayPrint(double * a, int n);
 void Banded(int n, int m, int NS, double* H, double alpha, double beta);
+void sym2PackedConverter(int n, double* Hp, double* H);
 
 
 int main(int argc, char **argv)
@@ -40,21 +53,30 @@ int main(int argc, char **argv)
 	double dx = 1;
     double dy = 1;
     double h = dx;
-    int Nx = 10;
-    int Ny = 10;
-    double Lx = dx*Nx;
-    double Ly = dy*Ny;
+    int Nx = 101;
+    int Ny = 101;
+    double Lx = dx*(Nx-1);
+    double Ly = dy*(Ny-1);
     
     double dt = 0.001;
-    double t =  0.002;
+    double t =  6;
     int tn = t/dt; //number of time nodes
     
     //
     double * Au = new double[(Nx-2)*(Ny-2)*(Nx-2)*(Ny-2)];
     double * Av = new double[(Nx-2)*(Ny-2)*(Nx-2)*(Ny-2)];
+    
+    
+    int n = (Nx-2)*(Ny-2);
+    double * Aup = new double[n*(n+1)/2];
+    double * Avp = new double[n*(n+1)/2];
     Banded(Nx-2, Ny-2, (Nx-2)*(Ny-2), Au, mu1/h/h*(-4*dt)+1, mu1/h/h*dt);
     Banded(Nx-2, Ny-2, (Nx-2)*(Ny-2), Av, mu2/h/h*(-4*dt)+1, mu2/h/h*dt);
-    printMatrix(Au, (Nx-2)*(Ny-2), (Nx-2)*(Ny-2));
+    sym2PackedConverter(n, Aup, Au);
+    sym2PackedConverter(n, Avp, Av);
+    
+    
+    //printMatrix(Au, (Nx-2)*(Ny-2), (Nx-2)*(Ny-2));
     //
     double * yu = new double[(Nx-2)*(Ny-2)];
     double * yv = new double[(Nx-2)*(Ny-2)];
@@ -167,8 +189,8 @@ for (int j = 1; j < Nx-1; j++) {
 
 
 
-F77NAME(dgemv) ('N', (Nx-2)*(Ny-2), (Nx-2)*(Ny-2), 1, Au, (Nx-2)*(Ny-2), u_, 1, 0, yu, 1);
-F77NAME(dgemv) ('N', (Nx-2)*(Ny-2), (Nx-2)*(Ny-2), 1, Av, (Nx-2)*(Ny-2), v_, 1, 0, yv, 1);
+F77NAME(dspmv) ('l', n, 1, Aup, u_, 1, 0, yu, 1);
+F77NAME(dspmv) ('l', n, 1, Avp, v_, 1, 0, yv, 1);
 
 for (int j = 1; j < (Ny-1); j++) {
     for (int i = 1; i < (Nx-1); i++) {
@@ -355,6 +377,8 @@ void Banded(int n, int m, int NS, double* H, double alpha, double beta) {
     }
 }
 
+
+
 void singleUpperBanded(int nsv, double* H, double alpha, double beta) {
     H[0] = alpha;
     H[1] = beta;
@@ -371,5 +395,16 @@ void arrayPrint(double * a, int n) {
     
         cout << a[i] << endl;    
     
+    }
+}
+
+void sym2PackedConverter(int n, double* Hp, double* H) {
+    //size of Hp must be n*(n+1)/2, where n is dimension of symmetric matrix
+    int k = 0;
+    for (int j = 0; j < n; j++) {
+            for (int i = 0; i < n-j; i++){
+               Hp[k] = H[j*n+j+i]; 
+               k = k + 1;
+            }
     }
 }
